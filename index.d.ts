@@ -84,6 +84,14 @@ export function handleResponses(expressApp: Express, options: HandleResponsesOpt
 export function handleRequests(): void;
 
 /**
+ * As a modification to express-oas-generator, to make it compatible with
+ * terminal middlewear that doesn't call next():
+ * Add this after handleResponses and any primary middleware; and before
+ * adding routes and handleRequests.
+ */
+export function handleRequestsEarly(): void;
+
+/**
  * @warn it's preferred that you use `handleResponses`,
  * `handleRequests` and `serveApiDocs` **individually**
  * and not directly from this `init` function,

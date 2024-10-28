@@ -82,6 +82,8 @@ let swaggerDocumentOptions;
  */
 let responseMiddlewareHasBeenApplied = false;
 
+let requestMiddlewareHasBeenAppliedEarly = false;
+
 /**
  *
  */
@@ -411,7 +413,12 @@ function handleResponses(expressApp,
   if (isEnvironmentIgnored) {
     return;
   }
-  
+
+  /** make sure the middleware placement order (by the user) is correct */
+  if (requestMiddlewareHasBeenAppliedEarly !== false) {
+    throw new Error(WRONG_MIDDLEWARE_ORDER_ERROR);
+  }
+
   responseMiddlewareHasBeenApplied = true;
 
   /** middleware to handle RESPONSES */
@@ -428,6 +435,41 @@ function handleResponses(expressApp,
       console.log("Error in express-oas-generator response handler.", e);
     } finally {
       /** always call the next middleware */
+      next();
+    }
+  });
+}
+
+/**
+ * @type { typeof import('./index').handleRequestsEarly }
+ */
+function handleRequestsEarly() {
+  const isIgnoredEnvironment = ignoredNodeEnvironments.includes(process.env.NODE_ENV);
+  if (isIgnoredEnvironment) {
+    return;
+  }
+
+  if (requestMiddlewareHasBeenAppliedEarly) {
+    return;
+  }
+  requestMiddlewareHasBeenAppliedEarly = true;
+
+  /** middleware to handle REQUESTS */
+  app.use((req, res, next) => {
+    try {
+      const methodAndPathKey = getMethod(req);
+      if (methodAndPathKey && methodAndPathKey.method && methodAndPathKey.pathKey) {
+        const method = methodAndPathKey.method;
+        updateSchemesAndHost(req);
+        processors.processPath(req, method, methodAndPathKey.pathKey);
+        processors.processHeaders(req, method, spec);
+        processors.processBody(req, method);
+        processors.processQuery(req, method);
+        writeSpecToOutputFile();
+      }
+    } catch (e) {
+      console.log("Error in express-oas-generator request handler.", e);
+    } finally {
       next();
     }
   });
@@ -459,26 +501,10 @@ function handleRequests() {
   if (specOutputPath) {
     ensureDirectoryExistence(specOutputPath);
   }
-  
-  /** middleware to handle REQUESTS */
-  app.use((req, res, next) => {
-    try {
-      const methodAndPathKey = getMethod(req);
-      if (methodAndPathKey && methodAndPathKey.method && methodAndPathKey.pathKey) {
-        const method = methodAndPathKey.method;
-        updateSchemesAndHost(req);
-        processors.processPath(req, method, methodAndPathKey.pathKey);
-        processors.processHeaders(req, method, spec);
-        processors.processBody(req, method);
-        processors.processQuery(req, method);
-        writeSpecToOutputFile();
-      }
-    } catch (e) {
-      console.log("Error in express-oas-generator request handler.", e);
-    } finally {
-      next();
-    }
-  });
+
+  // This isn't "early" anymore, but it will run only if it hasn't before.
+  handleRequestsEarly();
+  requestMiddlewareHasBeenAppliedEarly = false; // reset.
 }
 
 /**
@@ -540,6 +566,7 @@ const setPackageInfoPath = pkgInfoPath => {
 module.exports = {
   handleResponses,
   handleRequests,
+  handleRequestsEarly,
   init,
   getSpec,
   getSpecV3,

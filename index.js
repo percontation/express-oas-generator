@@ -425,7 +425,7 @@ function handleResponses(expressApp,
       }
       
     } catch (e) {
-      /** TODO - shouldn't we do something here? */
+      console.log("Error in express-oas-generator response handler.", e);
     } finally {
       /** always call the next middleware */
       next();
@@ -474,7 +474,7 @@ function handleRequests() {
         writeSpecToOutputFile();
       }
     } catch (e) {
-      /** TODO - shouldn't we do something here? */
+      console.log("Error in express-oas-generator request handler.", e);
     } finally {
       next();
     }

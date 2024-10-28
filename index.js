@@ -173,6 +173,11 @@ function prepareSpec() {
   endpoints.forEach(endpoint => {
     const params = [];
     let path = endpoint.path;
+    // This library incorrectly assumes that paths can be used as regexes rather
+    // than using path-to-regexp, which handles '*'s differently in Express 4.x.
+    // As a quick fix, don't try. It's better than getPathKey always SyntaxErroring.
+    if(path.includes("*"))
+      return;
     const matches = path.match(/:([^/]+)/g);
     if (matches) {
       matches.forEach(found => {
